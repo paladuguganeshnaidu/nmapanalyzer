@@ -298,14 +298,16 @@ void handle_scan_request(SOCKET client_socket, const char* query) {
         result.level_descriptions[2], 
         result.level_descriptions[3]);
     
-    // Save JSON to DB (best-effort). We no longer use save_scan_report_file_from_json here.
+    // Save JSON to DB (best-effort)
     if (db_is_ready()) {
-        if (db_save_scan(target, result.target_ip, result.timestamp, level, json_response) != 0) {
-            fprintf(stderr, "Failed to save scan to DB for %s\n", target);
+        int rc = db_save_scan(target, result.target_ip, result.timestamp, level, json_response);
+        if (rc == 0) {
+            printf("[+] Scan saved to DB: %s @ %s (level %d)\n", target, result.timestamp, level);
+        } else {
+            fprintf(stderr, "[-] db_save_scan failed (rc=%d) for %s\n", rc, target);
         }
     } else {
-        // DB not available; log a simple message instead.
-        printf("[+] Scan result for %s (level %d) not persisted to DB\n", target, level);
+        printf("[!] DB not ready — scan not persisted: %s (level %d)\n", target, level);
     }
 
     send_response(client_socket, json_response, "application/json");
