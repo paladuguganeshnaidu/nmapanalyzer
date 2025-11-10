@@ -13,7 +13,7 @@ RUN mkdir -p bin data
 # Build the server binary
 RUN gcc -Iinclude -o bin/nmap_server \
     src/main.c src/server.c src/scanner.c src/db.c src/utils.c src/sqlite3.c \
-    -pthread -ldl || true
+    -pthread -ldl
 
 # Expose the port the app listens on (server uses 8080 by default)
 EXPOSE 8080
