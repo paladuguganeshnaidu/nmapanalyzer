@@ -1,0 +1,5 @@
+# render.yaml - placeholder
+service: nmap_scanner
+build:
+  image: gcc:latest
+  cmd: make

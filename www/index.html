@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nmap Scanner</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Nmap Automation Tool</h1>
+        <div id="status" class="status">
+            <strong>Status:</strong> <span id="statusText">checking...</span>
+            <span id="storageInfo"></span>
+        </div>
+        <form id="scanForm">
+            <div class="form-group">
+                <label for="target">Target (IP or Domain):</label>
+                <input type="text" id="target" name="target" required>
+            </div>
+            <div class="form-group">
+                <label for="level">Scan Level:</label>
+                <select id="level" name="level">
+                    <option value="1">Level 1 - Basic (Ping + Fast Port Scan)</option>
+                    <option value="2">Level 2 - Medium (Service Version Detection)</option>
+                    <option value="3">Level 3 - Advanced (Vulnerability Scripts + Firewall Detection)</option>
+                    <option value="4">Level 4 - Expert (Aggressive Scanning)</option>
+                </select>
+            </div>
+            <button type="submit">Start Scan</button>
+        </form>
+        <div id="loading" class="hidden">Scanning...</div>
+        <div id="results" class="hidden">
+            <h2>Scan Results</h2>
+            <div id="resultContent"></div>
+        </div>
+        <div id="historySection">
+            <h2>Scan History</h2>
+            <div id="historyList">Loading history...</div>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>

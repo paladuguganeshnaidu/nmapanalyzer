@@ -1,0 +1,7 @@
+# Ignore DB and build artifacts
+/data/scan_results.db
+/data/scans.db
+/bin/
+*.o
+nmap_scanner
+.DS_Store
