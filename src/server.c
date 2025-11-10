@@ -1,15 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <winsock2.h>
-#include <ws2tcpip.h>
-#include <process.h>
+#include <stdint.h>
 #include "scanner.h"
 #include "server.h"
 #include "db.h"
-#include <stdint.h>
 
-#pragma comment(lib, "ws2_32.lib")
+#ifndef _WIN32
+#include <pthread.h>
+#endif
 
 #define PORT 8080
 #define BUFFER_SIZE 4096
@@ -22,52 +21,47 @@ void handle_scan_request(SOCKET client_socket, const char* query);
 #include <time.h>
 
 int server_start(int port) {
-    WSADATA wsa;
     SOCKET server_socket, client_socket;
     struct sockaddr_in server_addr, client_addr;
     int client_len = sizeof(client_addr);
+
     // Initialize DB (use data/scans.db)
     if (!db_init("data/scans.db")) {
         fprintf(stderr, "Warning: failed to initialize DB, continuing without persistence.\n");
     }
-    
-    // Initialize Winsock
-    if (WSAStartup(MAKEWORD(2,2), &wsa) != 0) {
-        printf("Failed to initialize Winsock.\n");
-        return 1;
-    }
-    
+
+#ifndef _WIN32
+    // POSIX: nothing like WSAStartup
+#endif
+
     // Create socket
     server_socket = socket(AF_INET, SOCK_STREAM, 0);
     if (server_socket == INVALID_SOCKET) {
         printf("Failed to create socket.\n");
-        WSACleanup();
         return 1;
     }
-    
+
     // Prepare sockaddr_in structure
     server_addr.sin_family = AF_INET;
     server_addr.sin_addr.s_addr = INADDR_ANY;
-    server_addr.sin_port = htons(PORT);
-    
+    server_addr.sin_port = htons(port);
+
     // Bind
-    if (bind(server_socket, (struct sockaddr*)&server_addr, sizeof(server_addr)) == SOCKET_ERROR) {
+    if (bind(server_socket, (struct sockaddr*)&server_addr, sizeof(server_addr)) == -1) {
         printf("Bind failed.\n");
         closesocket(server_socket);
-        WSACleanup();
         return 1;
     }
-    
+
     // Listen
-    if (listen(server_socket, 3) == SOCKET_ERROR) {
+    if (listen(server_socket, 3) == -1) {
         printf("Listen failed.\n");
         closesocket(server_socket);
-        WSACleanup();
         return 1;
     }
-    
+
     printf("Server running on http://localhost:%d\n", port);
-    
+
     // Accept and handle incoming connections
     while (1) {
         client_socket = accept(server_socket, (struct sockaddr*)&client_addr, &client_len);
@@ -75,17 +69,27 @@ int server_start(int port) {
             printf("Accept failed.\n");
             continue;
         }
-        
-        // Handle request in a separate thread
+
+#ifndef _WIN32
+        // Create a pthread that calls handle_request
+        pthread_t th;
+        int rc = pthread_create(&th, NULL, (void*(*)(void*))handle_request, (void*)(uintptr_t)client_socket);
+        if (rc != 0) {
+            printf("Thread creation failed.\n");
+            closesocket(client_socket);
+        } else {
+            pthread_detach(th);
+        }
+#else
         uintptr_t th = _beginthread(handle_request, 0, (void*)(uintptr_t)client_socket);
         if (th == (uintptr_t)-1) {
             printf("Thread creation failed.\n");
             closesocket(client_socket);
         }
+#endif
     }
-    
+
     closesocket(server_socket);
-    WSACleanup();
     return 0;
 }
 
@@ -298,16 +302,14 @@ void handle_scan_request(SOCKET client_socket, const char* query) {
         result.level_descriptions[2], 
         result.level_descriptions[3]);
     
-    // Save JSON to DB (best-effort)
+    // Save JSON to DB (best-effort). We no longer use save_scan_report_file_from_json here.
     if (db_is_ready()) {
-        int rc = db_save_scan(target, result.target_ip, result.timestamp, level, json_response);
-        if (rc == 0) {
-            printf("[+] Scan saved to DB: %s @ %s (level %d)\n", target, result.timestamp, level);
-        } else {
-            fprintf(stderr, "[-] db_save_scan failed (rc=%d) for %s\n", rc, target);
+        if (db_save_scan(target, result.target_ip, result.timestamp, level, json_response) != 0) {
+            fprintf(stderr, "Failed to save scan to DB for %s\n", target);
         }
     } else {
-        printf("[!] DB not ready — scan not persisted: %s (level %d)\n", target, level);
+        // DB not available; log a simple message instead.
+        printf("[+] Scan result for %s (level %d) not persisted to DB\n", target, level);
     }
 
     send_response(client_socket, json_response, "application/json");

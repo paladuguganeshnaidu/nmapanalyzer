@@ -2,9 +2,18 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#ifdef _WIN32
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #pragma comment(lib, "ws2_32.lib")
+#else
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <netdb.h>
+#include <unistd.h>
+#endif
 
 #define MAX_BUFFER 4096
 #define MAX_PORTS 100
@@ -52,7 +61,7 @@ void run_nmap_scan(const char *target, int level, struct ScanResult *result) {
     
     // Level 1: Basic scanning
     snprintf(cmd, sizeof(cmd), "nmap -sn %s", target);
-    fp = _popen(cmd, "r");
+    fp = popen(cmd, "r");
     if (fp) {
         int len = 0;
         while (fgets(buffer, sizeof(buffer), fp) && len < sizeof(result->level_descriptions[0])-1) {
@@ -64,12 +73,12 @@ void run_nmap_scan(const char *target, int level, struct ScanResult *result) {
                 break;
             }
         }
-        _pclose(fp);
+    pclose(fp);
     }
     
     // Basic port scan
     snprintf(cmd, sizeof(cmd), "nmap -F %s", target);
-    fp = _popen(cmd, "r");
+    fp = popen(cmd, "r");
     if (fp) {
         int len = strlen(result->level_descriptions[0]);
         while (fgets(buffer, sizeof(buffer), fp) && len < sizeof(result->level_descriptions[0])-1) {
@@ -81,7 +90,7 @@ void run_nmap_scan(const char *target, int level, struct ScanResult *result) {
                 break;
             }
         }
-        _pclose(fp);
+    pclose(fp);
     }
     
     if (level >= 2) {
@@ -143,7 +152,7 @@ void run_nmap_scan(const char *target, int level, struct ScanResult *result) {
     
     // Get open ports for exploit suggestions
     snprintf(cmd, sizeof(cmd), "nmap -p- --open %s | findstr /i \"open\" | for /f \"tokens=1 delims=/\" %%i in ('more') do @echo %%i", target);
-    fp = _popen(cmd, "r");
+    fp = popen(cmd, "r");
     if (fp) {
         char port_str[10];
         while (fgets(port_str, sizeof(port_str), fp) && result->port_count < MAX_PORTS) {
@@ -153,7 +162,7 @@ void run_nmap_scan(const char *target, int level, struct ScanResult *result) {
                 result->open_ports[result->port_count++] = atoi(port_str);
             }
         }
-        _pclose(fp);
+            pclose(fp);
     }
 }
 
@@ -260,25 +269,25 @@ void detect_firewall(const char *target) {
     
     // Run SYN scan vs Connect scan
     snprintf(cmd, sizeof(cmd), "nmap -sS -p 80,443 %s", target);
-    fp = _popen(cmd, "r");
+    fp = popen(cmd, "r");
     if (fp) {
         char buffer[MAX_BUFFER];
         printf("SYN scan results:\n");
         while (fgets(buffer, sizeof(buffer), fp)) {
             printf("  %s", buffer);
         }
-        _pclose(fp);
+            pclose(fp);
     }
     
     snprintf(cmd, sizeof(cmd), "nmap -sT -p 80,443 %s", target);
-    fp = _popen(cmd, "r");
+    fp = popen(cmd, "r");
     if (fp) {
         char buffer[MAX_BUFFER];
         printf("Connect scan results:\n");
         while (fgets(buffer, sizeof(buffer), fp)) {
             printf("  %s", buffer);
         }
-        _pclose(fp);
+    pclose(fp);
     }
     
     printf("\n[*] Compare results above to detect potential firewall filtering.\n");
