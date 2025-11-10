@@ -94,9 +94,9 @@ void run_nmap_scan(const char *target, int level, struct ScanResult *result) {
     }
     
     if (level >= 2) {
-        // Service version detection
-        snprintf(cmd, sizeof(cmd), "nmap -sV %s", target);
-        fp = _popen(cmd, "r");
+    // Service version detection
+    snprintf(cmd, sizeof(cmd), "nmap -sV %s", target);
+    fp = popen(cmd, "r");
         if (fp) {
             int len = 0;
             while (fgets(buffer, sizeof(buffer), fp) && len < sizeof(result->level_descriptions[1])-1) {
@@ -108,14 +108,14 @@ void run_nmap_scan(const char *target, int level, struct ScanResult *result) {
                     break;
                 }
             }
-            _pclose(fp);
+            pclose(fp);
         }
     }
     
     if (level >= 3) {
         // Vulnerability scripts
-        snprintf(cmd, sizeof(cmd), "nmap --script auth,vuln,safe -F %s", target);
-        fp = _popen(cmd, "r");
+    snprintf(cmd, sizeof(cmd), "nmap --script auth,vuln,safe -F %s", target);
+    fp = popen(cmd, "r");
         if (fp) {
             int len = 0;
             while (fgets(buffer, sizeof(buffer), fp) && len < sizeof(result->level_descriptions[2])-1) {
@@ -127,14 +127,14 @@ void run_nmap_scan(const char *target, int level, struct ScanResult *result) {
                     break;
                 }
             }
-            _pclose(fp);
+            pclose(fp);
         }
     }
     
     if (level >= 4) {
         // Expert scan
-        snprintf(cmd, sizeof(cmd), "nmap --script vuln --randomize-hosts --scan-delay 5 -F %s", target);
-        fp = _popen(cmd, "r");
+    snprintf(cmd, sizeof(cmd), "nmap --script vuln --randomize-hosts --scan-delay 5 -F %s", target);
+    fp = popen(cmd, "r");
         if (fp) {
             int len = 0;
             while (fgets(buffer, sizeof(buffer), fp) && len < sizeof(result->level_descriptions[3])-1) {
@@ -146,7 +146,7 @@ void run_nmap_scan(const char *target, int level, struct ScanResult *result) {
                     break;
                 }
             }
-            _pclose(fp);
+            pclose(fp);
         }
     }
     

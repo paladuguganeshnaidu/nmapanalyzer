@@ -184,7 +184,7 @@ void send_response(SOCKET client_socket, const char* content, const char* conten
     sprintf(header, 
         "HTTP/1.1 200 OK\r\n"
         "Content-Type: %s\r\n"
-        "Content-Length: %d\r\n"
+        "Content-Length: %zu\r\n"
         "Connection: close\r\n\r\n",
         content_type, strlen(content));
     
