@@ -150,8 +150,9 @@ void run_nmap_scan(const char *target, int level, struct ScanResult *result) {
         }
     }
     
-    // Get open ports for exploit suggestions
-    snprintf(cmd, sizeof(cmd), "nmap -p- --open %s | findstr /i \"open\" | for /f \"tokens=1 delims=/\" %%i in ('more') do @echo %%i", target);
+    // Get open ports for exploit suggestions (portable Linux pipeline)
+    // Use nmap grepable output, split Ports field and extract port numbers
+    snprintf(cmd, sizeof(cmd), "nmap -p- --open -oG - %s | sed -n 's/.*Ports: //p' | tr ',' '\\n' | awk -F'/' '{print $1}'", target);
     fp = popen(cmd, "r");
     if (fp) {
         char port_str[10];
