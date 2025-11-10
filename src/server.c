@@ -14,7 +14,9 @@
 #define BUFFER_SIZE 4096
 
 // Function declarations
-void __cdecl handle_request(void* arg);
+void handle_request(void* arg);
+/* POSIX thread wrapper: pthread requires a function returning void* */
+static void *handle_request_thread(void *arg) { handle_request(arg); return NULL; }
 void send_response(SOCKET client_socket, const char* content, const char* content_type);
 void send_file(SOCKET client_socket, const char* filepath);
 void handle_scan_request(SOCKET client_socket, const char* query);
@@ -73,7 +75,7 @@ int server_start(int port) {
 #ifndef _WIN32
         // Create a pthread that calls handle_request
         pthread_t th;
-        int rc = pthread_create(&th, NULL, (void*(*)(void*))handle_request, (void*)(uintptr_t)client_socket);
+        int rc = pthread_create(&th, NULL, handle_request_thread, (void*)(uintptr_t)client_socket);
         if (rc != 0) {
             printf("Thread creation failed.\n");
             closesocket(client_socket);
@@ -93,7 +95,7 @@ int server_start(int port) {
     return 0;
 }
 
-void __cdecl handle_request(void* arg) {
+void handle_request(void* arg) {
     SOCKET client_socket = (SOCKET)(uintptr_t)arg;
     char buffer[BUFFER_SIZE];
     int bytes_received = recv(client_socket, buffer, BUFFER_SIZE - 1, 0);
