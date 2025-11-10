@@ -22,6 +22,40 @@ void send_file(SOCKET client_socket, const char* filepath);
 void handle_scan_request(SOCKET client_socket, const char* query);
 #include <time.h>
 
+// Small helper: escape JSON strings (in-place safe src->dst)
+static void json_escape(const char *src, char *dst, size_t dst_len) {
+    if (!src || !dst || dst_len == 0) return;
+    size_t di = 0;
+    const unsigned char *s = (const unsigned char*)src;
+    while (*s && di + 1 < dst_len) {
+        unsigned char c = *s++;
+        if (c == '"') {
+            if (di + 2 < dst_len) { dst[di++] = '\\'; dst[di++] = '"'; }
+        } else if (c == '\\') {
+            if (di + 2 < dst_len) { dst[di++] = '\\'; dst[di++] = '\\'; }
+        } else if (c == '\b') {
+            if (di + 2 < dst_len) { dst[di++] = '\\'; dst[di++] = 'b'; }
+        } else if (c == '\f') {
+            if (di + 2 < dst_len) { dst[di++] = '\\'; dst[di++] = 'f'; }
+        } else if (c == '\n') {
+            if (di + 2 < dst_len) { dst[di++] = '\\'; dst[di++] = 'n'; }
+        } else if (c == '\r') {
+            if (di + 2 < dst_len) { dst[di++] = '\\'; dst[di++] = 'r'; }
+        } else if (c == '\t') {
+            if (di + 2 < dst_len) { dst[di++] = '\\'; dst[di++] = 't'; }
+        } else if (c < 0x20) {
+            /* encode other controls as \u00XX */
+            if (di + 6 < dst_len) {
+                int n = snprintf(dst + di, dst_len - di, "\\u%04x", c);
+                if (n > 0) di += (size_t)n;
+            }
+        } else {
+            dst[di++] = c;
+        }
+    }
+    dst[di] = '\0';
+}
+
 int server_start(int port) {
     SOCKET server_socket, client_socket;
     struct sockaddr_in server_addr, client_addr;
@@ -283,9 +317,25 @@ void handle_scan_request(SOCKET client_socket, const char* query) {
     
     run_nmap_scan(ip_addr, level, &result);
     
-    // Format response as JSON
+    // Format response as JSON (escape fields to produce valid JSON strings)
+    char esc_target[256];
+    char esc_ip[INET_ADDRSTRLEN*2];
+    char esc_time[128];
+    char esc_basic[BUFFER_SIZE];
+    char esc_medium[BUFFER_SIZE];
+    char esc_advanced[BUFFER_SIZE];
+    char esc_expert[BUFFER_SIZE];
+
+    json_escape(target, esc_target, sizeof(esc_target));
+    json_escape(result.target_ip, esc_ip, sizeof(esc_ip));
+    json_escape(result.timestamp, esc_time, sizeof(esc_time));
+    json_escape(result.level_descriptions[0], esc_basic, sizeof(esc_basic));
+    json_escape(result.level_descriptions[1], esc_medium, sizeof(esc_medium));
+    json_escape(result.level_descriptions[2], esc_advanced, sizeof(esc_advanced));
+    json_escape(result.level_descriptions[3], esc_expert, sizeof(esc_expert));
+
     char json_response[BUFFER_SIZE * 4];
-    sprintf(json_response, 
+    snprintf(json_response, sizeof(json_response),
         "{\n"
         "  \"target\": \"%s\",\n"
         "  \"ip\": \"%s\",\n"
@@ -298,11 +348,8 @@ void handle_scan_request(SOCKET client_socket, const char* query) {
         "    \"expert\": \"%s\"\n"
         "  }\n"
         "}\n",
-        target, result.target_ip, result.timestamp, level,
-        result.level_descriptions[0], 
-        result.level_descriptions[1], 
-        result.level_descriptions[2], 
-        result.level_descriptions[3]);
+        esc_target, esc_ip, esc_time, level,
+        esc_basic, esc_medium, esc_advanced, esc_expert);
     
     // Save JSON to DB (best-effort). We no longer use save_scan_report_file_from_json here.
     if (db_is_ready()) {
